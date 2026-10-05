@@ -8,6 +8,7 @@
 - Hardened structured logging with allowlisted fields, bounded values, secret/PII redaction, and safe exception diagnostics.
 - Hardened artifact-path confinement and typed adapter compatibility without exposing source payloads.
 - Made TC-035 deterministic across UIDs by forcing the artifact persistence seam through an ordinary-file ancestor (`ENOTDIR`), preserving fail-closed status assertions.
+- Isolated TC-017 and replay artifacts under pytest `tmp_path` so host tests do not reuse non-writable bind-mounted Compose output.
 
 ## Verification
 

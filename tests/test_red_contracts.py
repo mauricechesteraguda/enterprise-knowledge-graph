@@ -24,11 +24,11 @@ def _contract(module_name: str, symbol: str) -> Callable[..., Any]:
     return cast(Callable[..., Any], candidate)
 
 
-def test_tc_001_reproducibility() -> None:
+def test_tc_001_reproducibility(tmp_path: Path) -> None:
     """TC-001: identical committed inputs produce equivalent outputs."""
     run = _contract("kg.etl.pipeline", "run")
-    first = run(seed=42, data_as_of="2026-01-31", run_id="run-a")
-    second = run(seed=42, data_as_of="2026-01-31", run_id="run-b")
+    first = run(seed=42, data_as_of="2026-01-31", run_id="run-a", artifact_dir=tmp_path)
+    second = run(seed=42, data_as_of="2026-01-31", run_id="run-b", artifact_dir=tmp_path)
     assert first["graph_hash"] == second["graph_hash"]
     assert first["data_as_of"] == second["data_as_of"] == "2026-01-31"
 
@@ -151,18 +151,18 @@ def test_tc_016_compose_health() -> None:
     assert result.required_failed is False
 
 
-def test_tc_017_etl_cli_full_pipeline() -> None:
+def test_tc_017_etl_cli_full_pipeline(tmp_path: Path) -> None:
     """TC-017: ETL runs all stages and writes run-partitioned artifacts."""
     run = _contract("kg.etl.cli", "run")
-    result = run(source="all", run_id="run-cli", data_as_of="2026-01-31")
+    result = run(source="all", run_id="run-cli", data_as_of="2026-01-31", artifact_dir=str(tmp_path))
     assert result.status == "succeeded"
     assert {"manifest", "quarantine", "resolution", "timings"} <= set(result.artifacts)
 
 
-def test_tc_018_etl_replay() -> None:
+def test_tc_018_etl_replay(tmp_path: Path) -> None:
     """TC-018: identical ETL runs have equivalent facts and distinct records."""
     replay = _contract("kg.etl.pipeline", "replay")
-    result = replay(seed=42, data_as_of="2026-01-31", run_ids=("run-a", "run-b"))
+    result = replay(seed=42, data_as_of="2026-01-31", run_ids=("run-a", "run-b"), artifact_dir=tmp_path)
     assert result.fact_multiset_equal is True
     assert result.duplicate_facts == 0
     assert result.run_ids == ("run-a", "run-b")
@@ -278,10 +278,10 @@ def test_tc_033_publishable_baseline() -> None:
     assert result.license == "MIT" and result.requires_cloud is False and result.requires_secret is False
 
 
-def test_tc_034_mapping_failure_closed() -> None:
+def test_tc_034_mapping_failure_closed(tmp_path: Path) -> None:
     """TC-034: mapper runtime failure publishes no partial graph."""
     run = _contract("kg.etl.pipeline", "run_source")
-    result = run("crm", mapping="invalid", run_id="run-fail")
+    result = run("crm", mapping="invalid", run_id="run-fail", artifact_dir=tmp_path)
     assert result.status == "failed" and result.published_facts == 0 and result.error_artifact is not None
 
 
@@ -395,9 +395,9 @@ def test_tc_049_health_semantics() -> None:
     assert health(fuseki="ok", crm="ok", pgvector="failed", provider="ok").status == "degraded"
 
 
-def test_tc_050_data_as_of_propagation() -> None:
+def test_tc_050_data_as_of_propagation(tmp_path: Path) -> None:
     """TC-050: fixed DATA_AS_OF propagates across emitted surfaces."""
     run = _contract("kg.etl.pipeline", "run")
-    result = run(seed=42, data_as_of="2026-01-31", run_id="run-date")
+    result = run(seed=42, data_as_of="2026-01-31", run_id="run-date", artifact_dir=tmp_path)
     assert result.data_as_of == "2026-01-31"
     assert all(surface.data_as_of == "2026-01-31" for surface in result.surfaces)

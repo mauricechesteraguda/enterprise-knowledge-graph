@@ -111,9 +111,9 @@ def run(seed: int = 42, data_as_of: str = "2026-01-31", run_id: str = "run-local
 
 
 @trace_call
-def replay(seed: int = 42, data_as_of: str = "2026-01-31", run_ids: tuple[str, str] = ("run-a", "run-b")) -> Any:
+def replay(seed: int = 42, data_as_of: str = "2026-01-31", run_ids: tuple[str, str] = ("run-a", "run-b"), artifact_dir: str | Path = "artifacts") -> Any:
     """Compare deterministic source facts while retaining distinct run IDs."""
-    first, second = (run(seed=seed, data_as_of=data_as_of, run_id=run_id) for run_id in run_ids)
+    first, second = (run(seed=seed, data_as_of=data_as_of, run_id=run_id, artifact_dir=artifact_dir) for run_id in run_ids)
     return type("ReplayResult", (), {"fact_multiset_equal": first["graph_hash"] == second["graph_hash"], "duplicate_facts": 0, "run_ids": run_ids})()
 
 
