@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test coverage check compose-config build up etl compose-tests docs
+.PHONY: install lint format typecheck package-completeness test coverage check compose-config build up etl compose-tests docs
 PYTHON ?= python3
 install:
 	$(PYTHON) -m pip install -e '.[dev]'
@@ -8,11 +8,14 @@ format:
 	$(PYTHON) -m ruff format src
 typecheck:
 	$(PYTHON) -m mypy src
+package-completeness:
+	@test -f src/kg/artifacts/__init__.py && test -f src/kg/artifacts/security.py
+	@if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then git ls-files --error-unmatch src/kg/artifacts/__init__.py src/kg/artifacts/security.py >/dev/null; fi
 test:
 	$(PYTHON) -m pytest
 coverage:
 	$(PYTHON) -m pytest --cov=src/kg --cov-branch --cov-report=term-missing --cov-report=xml --cov-fail-under=85 --maxfail=1
-check: lint typecheck
+check: package-completeness lint typecheck
 
 compose-config:
 	docker compose config

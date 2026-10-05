@@ -12,7 +12,7 @@ dist/
 build/
 MVP.md
 *.egg-info/
-artifacts/
+/artifacts/
 coverage.xml
 .coverage
 .serena/

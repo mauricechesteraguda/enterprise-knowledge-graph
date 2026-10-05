@@ -2,6 +2,7 @@
 
 ## Enterprise KG MVP verification
 
+- Fixed CI package completeness by anchoring runtime artifact ignores and tracking the artifact-security package.
 - Added bounded request/run correlation across API, ETL, graph publication, and query boundaries.
 - Hardened structured logging with allowlisted fields, bounded values, secret/PII redaction, and safe exception diagnostics.
 - Hardened artifact-path confinement and typed adapter compatibility without exposing source payloads.
