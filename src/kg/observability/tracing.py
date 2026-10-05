@@ -3,12 +3,13 @@
 from __future__ import annotations
 import functools
 import hashlib
+import inspect
 import json
 import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, ParamSpec, TypeVar, cast
+from typing import Any, Callable, ParamSpec, TypeVar, cast, get_type_hints
 P = ParamSpec("P")
 R = TypeVar("R")
 _REPO_HASH = hashlib.sha256(str(Path.cwd().resolve()).encode("utf-8")).hexdigest()[:16]
@@ -20,7 +21,28 @@ def _write_trace(event: dict[str, Any]) -> None:
     with _TRACE_PATH.open("a", encoding="utf-8") as stream:
         stream.write(json.dumps(event, sort_keys=True) + "\n")
 def trace_call(func: Callable[P, R]) -> Callable[P, R]:
-    """Trace entry, successful exit, and exception without argument values."""
+    """Trace sync and async entry, successful exit, and exception without values."""
+    # type-10052026-Maurice: Preserve coroutine semantics for traced FastAPI handlers.
+    if inspect.iscoroutinefunction(func):
+        @functools.wraps(func)
+        async def async_wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
+            name = f"{func.__module__}.{func.__qualname__}"
+            _write_trace({"ts": datetime.now(timezone.utc).isoformat(), "phase": "entry", "function": name})
+            try:
+                result = await func(*args, **kwargs)  # type: ignore[misc]
+            except Exception as exc:
+                _write_trace({"ts": datetime.now(timezone.utc).isoformat(), "phase": "exception", "function": name, "error_type": type(exc).__name__})
+                raise
+            _write_trace({"ts": datetime.now(timezone.utc).isoformat(), "phase": "exit", "function": name, "outcome": "success"})
+            return result
+        try:
+            annotations = get_type_hints(func)
+            async_wrapped.__annotations__ = annotations
+            signature = inspect.signature(func)
+            async_wrapped.__signature__ = signature.replace(parameters=[parameter.replace(annotation=annotations.get(parameter.name, parameter.annotation)) for parameter in signature.parameters.values()], return_annotation=annotations.get("return", signature.return_annotation))
+        except (NameError, TypeError):
+            pass
+        return cast(Callable[P, R], async_wrapped)
     @functools.wraps(func)
     def wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
         name = f"{func.__module__}.{func.__qualname__}"
@@ -32,6 +54,13 @@ def trace_call(func: Callable[P, R]) -> Callable[P, R]:
             raise
         _write_trace({"ts": datetime.now(timezone.utc).isoformat(), "phase": "exit", "function": name, "outcome": "success"})
         return result
+    try:
+        annotations = get_type_hints(func)
+        wrapped.__annotations__ = annotations
+        signature = inspect.signature(func)
+        wrapped.__signature__ = signature.replace(parameters=[parameter.replace(annotation=annotations.get(parameter.name, parameter.annotation)) for parameter in signature.parameters.values()], return_annotation=annotations.get("return", signature.return_annotation))
+    except (NameError, TypeError):
+        pass
     return cast(Callable[P, R], wrapped)
 @trace_call
 def trace_path() -> Path:

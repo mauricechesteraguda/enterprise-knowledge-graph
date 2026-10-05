@@ -34,3 +34,10 @@ def log_event(logger: logging.Logger, event: str, **fields: Any) -> None:
     safe = {key: value for key, value in fields.items() if key in _ALLOWED}
     safe["event"] = event
     logger.info(event, extra={"event_fields": safe})
+
+
+@trace_call
+def serialize_event(**fields: Any) -> str:
+    # type-10052026-Maurice: Provide a testable redaction seam that drops prompts and secrets.
+    safe = {key: value for key, value in fields.items() if key in _ALLOWED and not _SECRET.search(key)}
+    return json.dumps(safe, sort_keys=True)

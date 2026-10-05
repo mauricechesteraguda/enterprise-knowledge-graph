@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Knowledge Graph Operations</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <p class="eyebrow">ENTERPRISE KNOWLEDGE GRAPH · OPERATIONS</p>
+      <h1>Grounded answers, visible evidence.</h1>
+      <p class="lede">A local, read-only view of graph health, ETL freshness, and answer provenance.</p>
+    </header>
+    <section aria-labelledby="health-heading">
+      <div class="section-heading"><h2 id="health-heading">Service health</h2><span id="health-status" class="status pending">Loading</span></div>
+      <div id="health-cards" class="cards" aria-live="polite"></div>
+    </section>
+    <section aria-labelledby="question-heading" class="ask-panel">
+      <div class="section-heading"><h2 id="question-heading">Ask the graph</h2><span id="answer-status" class="status">Ready</span></div>
+      <label for="sample-question">Sample question</label>
+      <select id="sample-question">
+        <option value="">Choose a grounded question…</option>
+        <option>Which organizations have unpaid invoices?</option>
+        <option>Which high priority products are open this quarter?</option>
+        <option>Show canonical identity records.</option>
+      </select>
+      <label for="question">Custom question</label>
+      <textarea id="question" rows="3" maxlength="1000" placeholder="Ask a question supported by the graph…"></textarea>
+      <button id="ask" type="button">Get grounded answer</button>
+      <p id="ask-message" class="message" role="status"></p>
+      <article id="answer-card" class="answer-card" hidden></article>
+    </section>
+    <section aria-labelledby="stats-heading">
+      <div class="section-heading"><h2 id="stats-heading">Graph snapshot</h2><span id="stats-status" class="status pending">Loading</span></div>
+      <div id="stats-cards" class="cards" aria-live="polite"></div>
+    </section>
+  </main>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

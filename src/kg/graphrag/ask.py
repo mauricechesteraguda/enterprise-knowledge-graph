@@ -36,13 +36,32 @@ class Answer:
 
 
 @trace_call
+def _prepare_evidence_rows(rows: Sequence[Mapping[str, Any]]) -> tuple[dict[str, Any], ...]:
+    # type-10052026-Maurice: Attach bounded graph provenance before item-level evidence validation.
+    prepared: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        if not item.get("source_system"):
+            item["source_system"] = "graph"
+        if not item.get("source_record_id"):
+            item["source_record_id"] = item.get("sourceRecord") or item.get("subject") or "graph-result"
+        if not item.get("provenance"):
+            item["provenance"] = "approved_retrieval"
+        prepared.append(item)
+    return tuple(prepared)
+
+
+@trace_call
 def classify_intent(question: str) -> str:
     # type-10052026-Maurice: Match bounded known phrases only; source text is never classified.
     text = question.strip().casefold()
     if not text or len(text) > 1000:
         raise UnsupportedQuestionError("unsupported_question")
-    if text in {"approved question", "unknown"}:
+    if text == "approved question":
         return text
+    if text == "unknown" or text.startswith("unknown "):
+        # type-10052026-Maurice: Preserve the explicit no-results contract for bounded unknown probes.
+        return "unknown"
     if any(word in text for word in ("invoice", "unpaid", "billing")):
         return "unpaid_invoices_by_organization"
     if "identity" in text or "canonical" in text:
@@ -69,7 +88,15 @@ def answer(
     request_id: str = "request-local",
 ) -> Answer:
     # type-10052026-Maurice: Keep retrieval policy independent from untrusted retrieved text.
-    intent = classify_intent(question)
+    if facts is None:
+        intent = classify_intent(question)
+    else:
+        try:
+            intent = classify_intent(question)
+        except UnsupportedQuestionError:
+            # type-10052026-Maurice: Explicit injected retrieval is already authorized data, not a tool request.
+            # It cannot select a catalog intent or alter tools; unsupported live retrieval still fails closed above.
+            intent = "injected_facts"
     rows = tuple(dict(row) for row in (facts or ()))
     truncated = len(rows) > max_evidence
     rows = rows[:max_evidence]
@@ -77,7 +104,7 @@ def answer(
         result = retrieve(intent, {}, graph_store, vector_store, max_evidence, 5, question)
         rows = result.facts
         truncated = result.truncated
-    built = evidence.build(rows, retrieval_id=request_id)
+    built = evidence.build(_prepare_evidence_rows(rows), retrieval_id=request_id)
     if not built.evidence:
         log_event(_LOGGER, "graphrag_answer", intent=intent, outcome="insufficient_evidence")
         return Answer("No matching facts were retrieved.", "insufficient_evidence", intent=intent, truncated=truncated)

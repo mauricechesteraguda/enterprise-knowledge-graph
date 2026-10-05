@@ -15,6 +15,7 @@ from rdflib.namespace import RDF
 
 from kg.observability.logging import get_logger, log_event
 from kg.observability.tracing import trace_call
+from kg.observability.metrics import record_stage
 
 _LOGGER = get_logger(__name__)
 KG = Namespace("https://example.org/kg/")
@@ -22,6 +23,16 @@ _QUERY_DIR = Path(__file__).resolve().parents[3] / "queries"
 _MAX_LIMIT = 1000
 _MAX_TIMEOUT = 5
 _SAFE_INTENT = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
+
+
+@trace_call
+def _query_file(name: str) -> Path:
+    # type-10052026-Maurice: Resolve committed query assets from source and installed Compose layouts.
+    candidates = (_QUERY_DIR / name, Path.cwd() / "queries" / name, Path("/app/queries") / name)
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(f"query asset unavailable: {name}")
 
 
 @dataclass(frozen=True)
@@ -132,7 +143,7 @@ class RDFLibGraphStore:
             parts = key.split("_")
             binding_name = parts[0] + "".join(part.title() for part in parts[1:])
             bindings[binding_name] = Literal(parameters[key])
-        rows = self.graph.query((_QUERY_DIR / spec.query_file).read_text(encoding="utf-8"), initBindings=bindings)
+        rows = self.graph.query(_query_file(spec.query_file).read_text(encoding="utf-8"), initBindings=bindings)
         return [{str(variable): str(value) for variable, value in row.asdict().items()} for row in rows][:limit]
 
 
@@ -181,10 +192,13 @@ def execute(intent: str, parameters: Mapping[str, str], store: Any | None = None
         if elapsed > timeout_seconds * 1000:
             raise TimeoutError
         log_event(_LOGGER, "catalog_query", intent=canonical, elapsed_ms=round(elapsed, 3), outcome="success")
+        record_stage("query", "success", elapsed / 1000)
         return CatalogResult(canonical, rows, spec.cap, spec.timeout_seconds, elapsed, len(rows) >= limit, False, int(getattr(graph_store, "calls", 1)), error=None)
     except TimeoutError:
+        record_stage("query", "failed", (time.monotonic() - started), "query_timeout")
         return CatalogResult(canonical, cap=spec.cap, timeout_seconds=spec.timeout_seconds, elapsed_ms=(time.monotonic() - started) * 1000, error=CatalogError("query_timeout", "query exceeded timeout"))
     except Exception:
+        record_stage("query", "failed", (time.monotonic() - started), "query_failed")
         return CatalogResult(canonical, cap=spec.cap, timeout_seconds=spec.timeout_seconds, elapsed_ms=(time.monotonic() - started) * 1000, error=CatalogError("query_failed", "query execution failed"))
 
 

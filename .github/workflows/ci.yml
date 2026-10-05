@@ -1,0 +1,39 @@
+name: reproducible-ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: make install
+      - name: Static and contract checks
+        run: make check
+      - name: Validate requirement mapping
+        run: python scripts/validate_csv_mapping.py
+      - name: Compose configuration
+        run: make compose-config
+      - name: Build local Compose stack
+        run: make build
+      - name: Start local Compose stack
+        run: docker compose up -d
+      - name: Explicit ETL profile
+        run: make etl
+      - name: Explicit test profile
+        run: make compose-tests
+      - name: Offline unit coverage gate
+        run: make coverage
+      - name: Cleanup Compose and traces
+        if: always()
+        run: docker compose down -v --remove-orphans

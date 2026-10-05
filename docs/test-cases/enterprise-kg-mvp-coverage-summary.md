@@ -1,6 +1,6 @@
 # Enterprise KG MVP test-case coverage summary
 
-This is the reviewable use-case specification for ticket 02 plus ticket 03's deterministic RED mapping. Cases remain unexecuted (`Not Run`) until the corresponding behavior is implemented. Team 1 scope: no subagents were spawned (no reviewer/debugger subagents).
+This is the reviewable use-case specification for ticket 02 plus ticket 03's deterministic RED mapping. Cases remain unexecuted (`Not Run`) until the corresponding behavior is implemented.
 
 ## Deterministic inventory
 
@@ -9,8 +9,8 @@ This is the reviewable use-case specification for ticket 02 plus ticket 03's det
 - Requirement IDs: `REQ-01` through `REQ-33`
 - Required outcome fields: `Expected Result` populated; `Actual Result` and `Remarks / Defects ID` blank; `Status (Pass/Fail)` exactly `Not Run`
 - Sort order: ascending test-case ID
-- Validator: external only at `/private/var/folders/hp/x3wtpd4n3r5_9x42nvhscznc0000gq/T/opencode/agent-scripts/knowledge-graph/validate_enterprise_kg_csv.py`
-- RED mapping validator: `/private/var/folders/hp/x3wtpd4n3r5_9x42nvhscznc0000gq/T/opencode/validate_red_contract_mapping.py`; result `50/50` CSV cases mapped to matching RED test IDs.
+- Validator: `scripts/validate_csv_mapping.py`
+- Mapping result: `50/50` CSV cases have complete requirement and automated-test references.
 
 ### Exact scripted Test Type counts
 

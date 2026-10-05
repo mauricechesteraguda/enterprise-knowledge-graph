@@ -1,0 +1,118 @@
+# type-10052026-Maurice: Keep local infrastructure pinned, isolated, and explicit.
+name: enterprise-kg
+
+services:
+  crm-postgres:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_DB: ${CRM_POSTGRES_DB:-crm}
+      POSTGRES_USER: ${CRM_POSTGRES_USER:-crm_reader}
+      POSTGRES_PASSWORD: ${CRM_POSTGRES_PASSWORD:-crm_local_only}
+    volumes:
+      - crm-postgres-data:/var/lib/postgresql/data
+      - ./docker/seed/crm.sql:/docker-entrypoint-initdb.d/001-crm.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    ports:
+      - "127.0.0.1:${CRM_POSTGRES_PORT:-5433}:5432"
+
+  fuseki:
+    image: secoresearch/fuseki:5.2.0
+    environment:
+      ADMIN_PASSWORD: ${FUSEKI_ADMIN_PASSWORD:-fuseki_local_only}
+      JVM_ARGS: ${FUSEKI_JVM_ARGS:--Xms128m -Xmx512m}
+    volumes:
+      - fuseki-data:/fuseki
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3030/$${FUSEKI_DATASET:-ds}/$/ping || wget -q -O /dev/null http://127.0.0.1:3030/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    ports:
+      - "127.0.0.1:${FUSEKI_PORT:-3030}:3030"
+
+  pgvector:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${VECTOR_POSTGRES_DB:-vectors}
+      POSTGRES_USER: ${VECTOR_POSTGRES_USER:-vector_reader}
+      POSTGRES_PASSWORD: ${VECTOR_POSTGRES_PASSWORD:-vector_local_only}
+    volumes:
+      - pgvector-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    ports:
+      - "127.0.0.1:${VECTOR_POSTGRES_PORT:-5434}:5432"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: enterprise-kg-api:local
+    environment:
+      KG_ENVIRONMENT: ${KG_ENVIRONMENT:-local}
+      KG_LOG_LEVEL: ${KG_LOG_LEVEL:-INFO}
+      KG_DATA_AS_OF: ${KG_DATA_AS_OF:-2026-01-01}
+      KG_ARTIFACT_DIR: /app/artifacts
+      KG_CRM_DSN: postgresql://${CRM_POSTGRES_USER:-crm_reader}:${CRM_POSTGRES_PASSWORD:-crm_local_only}@crm-postgres:5432/${CRM_POSTGRES_DB:-crm}
+      KG_CORS_ORIGINS: ${KG_CORS_ORIGINS:-["http://127.0.0.1:8000","http://localhost:8000"]}
+    volumes:
+      - ./artifacts:/app/artifacts
+    depends_on:
+      crm-postgres:
+        condition: service_healthy
+      fuseki:
+        condition: service_healthy
+      pgvector:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+
+  etl:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: enterprise-kg-etl:local
+    profiles: [etl]
+    command: ["kg-etl", "run", "--run-id", "${ETL_RUN_ID:-compose-run}", "--artifact-dir", "/app/artifacts"]
+    environment:
+      KG_ARTIFACT_DIR: /app/artifacts
+    volumes:
+      - ./artifacts:/app/artifacts
+    depends_on:
+      crm-postgres:
+        condition: service_healthy
+
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: tests
+    image: enterprise-kg-tests:local
+    profiles: [test]
+    command: ["python", "-m", "pytest", "--cov=kg", "--cov-branch", "--cov-report=term-missing", "--cov-fail-under=85", "--maxfail=1"]
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  crm-postgres-data:
+  fuseki-data:
+  pgvector-data:

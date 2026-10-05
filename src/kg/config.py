@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     crm_dsn: str = Field(default="", repr=False)
     billing_csv: Path = Path("data/raw/billing.csv")
     support_json: Path = Path("data/raw/support.json")
+    source_manifest: Path = Path("data/sources.json")
+    # type-10052026-Maurice: Keep browser access opt-in rather than wildcard by default.
+    cors_origins: list[str] = Field(default_factory=list)
 @trace_call
 def get_settings() -> Settings:
     """Build deterministic settings without cloud credentials."""

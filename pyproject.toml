@@ -10,7 +10,7 @@ requires-python = ">=3.11,<3.14"
 dependencies = ["fastapi==0.115.6", "pydantic-settings==2.7.1", "prometheus-client==0.21.1", "uvicorn[standard]==0.34.0", "Faker==35.2.0", "rdflib==7.1.3", "pyshacl==0.30.1"]
 
 [project.optional-dependencies]
-dev = ["mypy==1.14.1", "pytest==8.3.4", "pytest-cov==6.0.0", "ruff==0.9.2"]
+dev = ["httpx==0.28.1", "mypy==1.14.1", "pytest==8.3.4", "pytest-cov==6.0.0", "ruff==0.9.2"]
 
 [project.scripts]
 kg-api = "kg.api.app:main"
@@ -33,3 +33,13 @@ packages = ["kg"]
 [tool.pytest.ini_options]
 addopts = "--strict-markers"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["src/kg"]
+omit = ["src/kg/*/__init__.py"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true

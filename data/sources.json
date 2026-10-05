@@ -1,0 +1,5 @@
+{
+  "crm": {"connector_type": "postgres", "path": "data/raw/crm.json", "mapping": "mappings/crm.rml.ttl"},
+  "billing": {"connector_type": "csv", "path": "data/raw/billing.csv", "mapping": "mappings/billing.rml.ttl"},
+  "support": {"connector_type": "json", "path": "data/raw/support.json", "mapping": "mappings/support.rml.ttl"}
+}

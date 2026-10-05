@@ -1,0 +1,17 @@
+:root { color-scheme: dark; --ink: #e9f0f2; --muted: #91a4a8; --bg: #0b1517; --panel: #122326; --line: #254247; --accent: #6ee7c8; --warn: #f5c76b; --danger: #ff8d8d; }
+* { box-sizing: border-box; }
+body { margin: 0; background: radial-gradient(circle at top right, #17383b, var(--bg) 45%); color: var(--ink); font: 16px/1.5 system-ui, sans-serif; }
+.shell { max-width: 1100px; margin: auto; padding: 3rem 1.25rem 5rem; }
+.hero { border-bottom: 1px solid var(--line); padding-bottom: 2.5rem; margin-bottom: 2rem; }
+.eyebrow { color: var(--accent); font-size: .75rem; letter-spacing: .16em; font-weight: 700; }
+h1 { max-width: 700px; font-size: clamp(2.3rem, 7vw, 5rem); line-height: .98; margin: .75rem 0 1rem; letter-spacing: -.06em; }
+h2 { margin: 0; font-size: 1.2rem; } .lede, label, .message { color: var(--muted); }
+section { margin: 2rem 0; } .section-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .8rem; }
+.card, .answer-card, .ask-panel { background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); border-radius: 12px; padding: 1rem; }
+.card strong { display: block; font-size: 1.4rem; margin-top: .35rem; } .card small { color: var(--muted); }
+.status { border: 1px solid var(--line); border-radius: 999px; padding: .2rem .6rem; font-size: .75rem; } .status.ok { color: var(--accent); } .status.warn { color: var(--warn); } .status.error { color: var(--danger); } .status.pending { color: var(--muted); }
+label { display: block; font-size: .85rem; margin: 1rem 0 .35rem; } select, textarea { width: 100%; background: #0c191b; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: .75rem; font: inherit; } button { margin-top: 1rem; background: var(--accent); border: 0; border-radius: 8px; color: #08201c; cursor: pointer; font-weight: 700; padding: .75rem 1rem; } button:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--warn); outline-offset: 2px; }
+.answer-card h3 { margin-top: 0; } .evidence { border-left: 3px solid var(--accent); padding-left: .8rem; margin-top: 1rem; } .empty { color: var(--muted); }
+@media (max-width: 600px) { .shell { padding-top: 2rem; } h1 { font-size: 3rem; } .section-heading { align-items: flex-start; gap: .7rem; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
