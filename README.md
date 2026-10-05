@@ -1,6 +1,6 @@
 # Enterprise Knowledge Graph
 
-An offline-first portfolio implementation of a governed enterprise knowledge graph: ingest
+An offline-first implementation of a governed enterprise knowledge graph: ingest
 heterogeneous records, preserve provenance, resolve identities conservatively, publish a
 validated graph, and expose bounded evidence-backed queries.
 
