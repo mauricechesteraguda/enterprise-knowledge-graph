@@ -71,3 +71,23 @@ Released under the [MIT License](LICENSE). Fixtures and local Compose defaults a
 development data, not production credentials. The default graph store and provider seams
 are deterministic/offline; external adapters, production auth, operational persistence,
 and measured performance results remain explicit integration work.
+
+## Contribution
+
+This project is open for collaboration. If you wish to contribute:
+
+    Fork the repository.
+    Create a feature branch (git checkout -b feature/your-feature-name).
+    Commit your changes (git commit -m 'Add your feature').
+    Push to the branch (git push origin feature/your-feature-name).
+    Open a pull request.
+
+## Contact
+
+For any questions or inquiries, please reach out to www.linkedin.com/in/agudatech/.
+
+## Support
+
+If you find this project helpful and would like to support its ongoing development, consider buying me a coffee! Your support helps me keep working on this project and developing more features.
+
+[![Buy Me a Coffee](https://www.buymeacoffee.com/assets/img/custom_images/yellow_img.png)](https://www.buymeacoffee.com/mauriceague)
