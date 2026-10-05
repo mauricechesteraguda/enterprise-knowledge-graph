@@ -11,7 +11,8 @@ from typing import Any
 
 from kg.graph.publication import InMemoryGraphStore, PublicationResult, publish_metadata_graphs, publish_source_graph
 from kg.mapping.runner import map_source
-from kg.observability.logging import get_logger, log_event
+from kg.observability.logging import get_logger, log_event, log_exception
+from kg.artifacts.security import validate_path, validate_permissions, write_json_artifact
 from kg.observability.tracing import trace_call
 from kg.observability.metrics import record_stage
 
@@ -45,9 +46,11 @@ class ETLResult(dict[str, Any]):
 @trace_call
 def _write_artifact(root: Path, run_id: str, name: str, payload: Any) -> str:
     """Persist bounded JSON under a run partition; failures propagate."""
-    path = root / run_id / name
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, sort_keys=True, indent=2, default=str) + "\n", encoding="utf-8")
+    # type-10062026-Maurice: Validate both identity components and resolved symlink confinement before mkdir/write.
+    checked = validate_path(f"{run_id}/{name}", root, run_id=run_id)
+    if not checked.accepted or checked.path is None or not validate_permissions(checked.path):
+        raise ValueError("invalid_artifact_path")
+    path = write_json_artifact(root, f"{run_id}/{name}", payload)
     return str(path)
 
 
@@ -56,6 +59,10 @@ def run_source(source: str, mapping: str | None = None, run_id: str = "run-local
     """Run one source and publish only after mapping/artifact preparation succeeds."""
     started = perf_counter()
     root = Path(artifact_dir)
+    # type-10062026-Maurice: Reject invalid run identity before extraction or filesystem writes.
+    if not validate_path(f"{run_id}/manifest.json", root, run_id=run_id).accepted:
+        log_event(_LOGGER, "etl_run_failed", run_id=run_id if isinstance(run_id, str) else None, request_id=request_id, source=source, outcome="failed", error_code="invalid_run_id")
+        return ETLRun("failed", run_id if isinstance(run_id, str) else "invalid", data_as_of, error_artifact="invalid_run_id")
     try:
         if mapping == "invalid":
             raise ValueError("mapping runtime failed")
@@ -63,7 +70,7 @@ def run_source(source: str, mapping: str | None = None, run_id: str = "run-local
         records = [dict(record.payload or {}, source_system=record.source_system, source_record_id=record.source_record_id, run_id=record.run_id, data_as_of=data_as_of) for record in mapped.records]
         invalid = [record for record in records if str(record.get("status", "")).lower() in {"unknown", "settled"} or (record.get("due_date") is not None and str(record.get("due_date", "")).count("-") != 2) or (record.get("customer_email") == "bad-email")]
         valid = [record for record in records if record not in invalid]
-        result = publish_source_graph(source, run_id, store or InMemoryGraphStore(), valid)
+        result = publish_source_graph(source, run_id, store or InMemoryGraphStore(), valid, request_id=request_id)
         if result.status != "succeeded":
             raise RuntimeError("publication failed")
         manifest = _write_artifact(root, run_id, "manifest.json", {"run_id": run_id, "source": source, "data_as_of": data_as_of, "fact_count": result.fact_count})
@@ -81,19 +88,25 @@ def run_source(source: str, mapping: str | None = None, run_id: str = "run-local
         except Exception:
             error_path = None
         record_stage("extraction", "failed", perf_counter() - started, type(exc).__name__)
-        log_event(_LOGGER, "etl_run_failed", run_id=run_id, request_id=request_id, source=source, outcome="failed", error_code=type(exc).__name__)
+        log_exception(_LOGGER, "etl_run_failed", exc, operation="etl.run_source", run_id=run_id, request_id=request_id)
         return ETLRun("failed", run_id, data_as_of, artifacts={"error": error_path} if error_path else {}, error_artifact=error_path or type(exc).__name__, success_claimed=False, published_facts=0)
 
 
 @trace_call
 def run(seed: int = 42, data_as_of: str = "2026-01-31", run_id: str = "run-local", source: str = "all", artifact_dir: str | Path = "artifacts", store: Any | None = None, request_id: str | None = None) -> dict[str, Any]:
     """Run all or one configured source and return a reproducible summary."""
+    # type-10062026-Maurice: Fail closed for unsafe run IDs across every source partition.
+    if not isinstance(run_id, str) or not validate_path(f"{run_id}/manifest.json", artifact_dir, run_id=run_id).accepted:
+        log_event(_LOGGER, "etl_run_failed", run_id=run_id if isinstance(run_id, str) else None, request_id=request_id, source=source, outcome="failed", error_code="invalid_run_id")
+        return ETLResult({"status": "failed", "run_id": run_id, "data_as_of": data_as_of, "graph_hash": "", "artifacts": {}, "sources": ()}, data_as_of, ())
+    log_event(_LOGGER, "etl_run_started", run_id=run_id, request_id=request_id, source=source, outcome="started")
     sources = ("crm", "billing", "support") if source == "all" else (source,)
     active_store = store or InMemoryGraphStore()
     results = tuple(run_source(item, run_id=run_id, data_as_of=data_as_of, artifact_dir=artifact_dir, store=active_store, request_id=request_id) for item in sources)
-    metadata = publish_metadata_graphs(active_store, run_id) if all(item.status == "succeeded" for item in results) else ()
+    metadata = publish_metadata_graphs(active_store, run_id, request_id=request_id) if all(item.status == "succeeded" for item in results) else ()
     graph_hash = hashlib.sha256("|".join(item.graph_hash for item in results).encode()).hexdigest()
     payload = {"status": "succeeded" if all(item.status == "succeeded" for item in results) else "failed", "run_id": run_id, "data_as_of": data_as_of, "graph_hash": graph_hash, "artifacts": {key: value for item in results for key, value in item.artifacts.items()}, "sources": results, "metadata": metadata}
+    log_event(_LOGGER, "etl_run_completed", run_id=run_id, request_id=request_id, source=source, outcome=payload["status"])
     return ETLResult(payload, data_as_of, results)
 
 

@@ -11,7 +11,7 @@ from kg.audit.evidence import EvidenceStore
 from kg.graphrag import context, evidence, local_provider
 from kg.graphrag.retrieval import retrieve
 from kg.observability.tracing import trace_call
-from kg.observability.logging import get_logger, log_event
+from kg.observability.logging import get_logger, log_event, log_exception
 
 _LOGGER = get_logger(__name__)
 
@@ -101,22 +101,22 @@ def answer(
     truncated = len(rows) > max_evidence
     rows = rows[:max_evidence]
     if facts is None:
-        result = retrieve(intent, {}, graph_store, vector_store, max_evidence, 5, question)
+        result = retrieve(intent, {}, graph_store, vector_store, max_evidence, 5, question, request_id=request_id)
         rows = result.facts
         truncated = result.truncated
     built = evidence.build(_prepare_evidence_rows(rows), retrieval_id=request_id)
     if not built.evidence:
-        log_event(_LOGGER, "graphrag_answer", intent=intent, outcome="insufficient_evidence")
+        log_event(_LOGGER, "graphrag_answer", intent=intent, request_id=request_id, outcome="insufficient_evidence")
         return Answer("No matching facts were retrieved.", "insufficient_evidence", intent=intent, truncated=truncated)
     assembled = context.assemble([str(dict(item)) for item in built.evidence], max_tokens=max_tokens)
     if not provider_available:
-        log_event(_LOGGER, "graphrag_answer", intent=intent, outcome="provider_unavailable", error_code="provider_unavailable")
+        log_event(_LOGGER, "graphrag_answer", intent=intent, request_id=request_id, outcome="provider_unavailable", error_code="provider_unavailable")
         return Answer("The configured provider is unavailable.", "provider_unavailable", built.evidence, intent=intent, truncated=truncated, provider_status="unavailable")
     generator = provider or local_provider
     try:
         text = generator.generate(assembled.items, min(512, max_tokens))
-    except Exception:
-        log_event(_LOGGER, "graphrag_answer", intent=intent, outcome="provider_failed", error_code="provider_failed")
+    except Exception as exc:
+        log_exception(_LOGGER, "graphrag_provider_failed", exc, operation="graphrag.provider", request_id=request_id, error_code="provider_failed")
         return Answer("The configured provider is unavailable.", "provider_unavailable", built.evidence, intent=intent, truncated=truncated, provider_status="failed")
     store = EvidenceStore()
     snapshot = store.capture({

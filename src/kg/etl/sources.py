@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from pathlib import Path
-from typing import Any
 
 from kg.config import Settings, get_settings
 from kg.connectors import CSVConnector, JSONConnector, PostgresConnector

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import stat
 from pathlib import Path
 
@@ -51,7 +50,7 @@ def test_tc_012_auth_modes_cover_all_outcomes() -> None:
 
 
 def test_tc_014_logging_formatter_and_configuration_are_json_safe(caplog: pytest.LogCaptureFixture) -> None:
-    from kg.observability.logging import JsonFormatter, configure_logging, get_logger, log_event
+    from kg.observability.logging import JsonFormatter, configure_logging, get_logger, log_event, log_exception, serialize_event
 
     configure_logging()
     logger = get_logger("test-ticket13")
@@ -61,6 +60,25 @@ def test_tc_014_logging_formatter_and_configuration_are_json_safe(caplog: pytest
     record.event_fields = {"event": "safe_event", "request_id": "req-1", "prompt": "secret prompt", "token": "secret"}
     encoded = JsonFormatter().format(record)
     assert "secret prompt" not in encoded and "secret" not in encoded
+    sanitized = serialize_event(intent="customer@example.test", source="https://secret.example/path", request_id="caller@example.test")
+    assert "customer@example.test" not in sanitized and "https://secret.example/path" not in sanitized and "caller@example.test" not in sanitized
+    secrets = serialize_event(event="token=REDACTED_VALUE", operation="authorization: Bearer REDACTED_VALUE", outcome="credential=REDACTED_VALUE")
+    assert "REDACTED_VALUE" not in secrets and "graph_published" in serialize_event(event="graph_published")
+    class Hostile:
+        def __str__(self) -> str: raise AssertionError("must not stringify")
+    class HostileKey:
+        def __str__(self) -> str: raise AssertionError("must not stringify")
+    cycle: list[object] = []
+    cycle.append(cycle)
+    nested = {HostileKey(): Hostile(), "token": "NESTED_REDACTED_VALUE", "email": "person@example.test", "cycle": cycle}
+    normalized = json.loads(serialize_event(outcome=nested, elapsed_ms=float("nan"), request_id=float("inf")))
+    assert "NESTED_REDACTED_VALUE" not in json.dumps(normalized) and "person@example.test" not in json.dumps(normalized)
+    assert normalized["elapsed_ms"] == "NaN" and normalized["request_id"] == "Infinity"
+    assert "<object>" in serialize_event(outcome=object())
+    try:
+        raise RuntimeError("private detail")
+    except RuntimeError as exc:
+        log_exception(logger, "safe_failure", exc, operation="test.operation", request_id="req-1")
 
 
 def test_tc_016_health_optional_degradation_and_failure() -> None:
@@ -88,6 +106,10 @@ def test_tc_017_and_tc_038_source_discovery_and_connector_errors(tmp_path: Path)
     manifest.write_text(json.dumps({"new": {"connector_type": "json", "path": "data.json", "mapping": "map.ttl"}}), encoding="utf-8")
     configured = settings.model_copy(update={"source_manifest": manifest})
     assert source_configs(configured)[0].name == "new"
+    from kg.etl.cli import run as etl_run
+    with pytest.raises(ValueError, match="invalid_run_id"):
+        etl_run(run_id="../escape", artifact_dir=str(tmp_path))
+    assert not (tmp_path / "escape").exists()
 
 
 def test_tc_019_fixture_generation_and_validation(tmp_path: Path) -> None:
@@ -122,6 +144,63 @@ def test_tc_029_metrics_reject_unbounded_labels_and_record_errors() -> None:
     record_stage("evidence", "failed", 0.001, "test_error")
     with pytest.raises(ValueError):
         record_stage("customer-name", "success", 0.001)
+    from kg.graphrag.retrieval import retrieve
+    class BrokenVector:
+        def search(self, *args: object) -> object:
+            raise RuntimeError("private vector detail")
+    result = retrieve("unpaid_invoices", {}, vector_store=BrokenVector())
+    assert result.error_code is None and result.chunks == ()
+    from kg.query.catalog import execute
+    class ContextStore:
+        def query(self, intent: str, parameters: dict[str, str], limit: int, timeout_seconds: int, *, request_id: str | None = None, run_id: str | None = None) -> list[dict[str, str]]:
+            assert request_id == "req-029" and run_id == "run-029"
+            return []
+    assert execute("unpaid_invoices", {}, store=ContextStore(), request_id="req-029", run_id="run-029").error is None
+    from kg.query.catalog import _query_store
+    query_calls: list[dict[str, object]] = []
+    class QueryNone:
+        def query(self, *args: object) -> list[dict[str, str]]:
+            query_calls.append({"args": args})
+            return []
+    class QueryRequest:
+        def query(self, *args: object, request_id: str | None = None) -> list[dict[str, str]]:
+            query_calls.append({"request_id": request_id})
+            return []
+    class QueryRun:
+        def query(self, *args: object, run_id: str | None = None) -> list[dict[str, str]]:
+            query_calls.append({"run_id": run_id})
+            return []
+    class QueryBoth:
+        def query(self, *args: object, request_id: str | None = None, run_id: str | None = None) -> list[dict[str, str]]:
+            query_calls.append({"request_id": request_id, "run_id": run_id})
+            return []
+    class QueryKwargs:
+        def query(self, *args: object, **kwargs: object) -> list[dict[str, str]]:
+            query_calls.append(kwargs)
+            return []
+    for adapter in (QueryNone(), QueryRequest(), QueryRun(), QueryBoth(), QueryKwargs()):
+        _query_store(adapter, "unpaid_invoices", {}, 10, 1, request_id="req-029", run_id="run-029")
+    assert query_calls == [{"args": ("unpaid_invoices", {}, 10, 1)}, {"request_id": "req-029"}, {"run_id": "run-029"}, {"request_id": "req-029", "run_id": "run-029"}, {"request_id": "req-029", "run_id": "run-029"}]
+    from kg.graph.publication import _store_call
+    calls: list[dict[str, object]] = []
+    class NoContext:
+        def op(self, value: str) -> None: calls.append({"value": value})
+    class RequestOnly:
+        def op(self, value: str, *, request_id: str | None = None) -> None: calls.append({"value": value, "request_id": request_id})
+    class RunOnly:
+        def op(self, value: str, *, run_id: str | None = None) -> None: calls.append({"value": value, "run_id": run_id})
+    class Both:
+        def op(self, value: str, *, request_id: str | None = None, run_id: str | None = None) -> None: calls.append({"value": value, "request_id": request_id, "run_id": run_id})
+    class AnyContext:
+        def op(self, value: str, **kwargs: object) -> None: calls.append({"value": value, **kwargs})
+    for adapter in (NoContext(), RequestOnly(), RunOnly(), Both(), AnyContext()):
+        _store_call(adapter, "op", "value", request_id="req-029", run_id="run-029")
+    assert calls == [{"value": "value"}, {"value": "value", "request_id": "req-029"}, {"value": "value", "run_id": "run-029"}, {"value": "value", "request_id": "req-029", "run_id": "run-029"}, {"value": "value", "request_id": "req-029", "run_id": "run-029"}]
+    from kg.graphrag.ask import answer
+    class BrokenProvider:
+        def generate(self, *args: object) -> str:
+            raise RuntimeError("private provider detail")
+    assert answer("approved question", facts=[{"subject": "s"}], provider=BrokenProvider()).provider_status == "failed"
 
 
 def test_tc_030_performance_budget_measurement_and_ci_tolerance(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -150,6 +229,44 @@ def test_tc_043_artifact_security_rejects_payload_and_permission_edges(tmp_path:
     world.write_text("{}", encoding="utf-8")
     world.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IWOTH)
     assert not validate_permissions(world)
+    assert not validate_path("run/file.txt", tmp_path, run_id="../escape").accepted
+    outside = tmp_path.parent / "tc043-outside"
+    outside.mkdir()
+    (tmp_path / "link").symlink_to(outside, target_is_directory=True)
+    assert not validate_path("link/file.json", tmp_path).accepted
+    from kg.etl.pipeline import _write_artifact
+    import kg.etl.pipeline as pipeline
+    original_write_json_artifact = pipeline.write_json_artifact
+    pipeline.write_json_artifact = lambda *args, **kwargs: (_ for _ in ()).throw(ValueError("payload_too_large"))
+    try:
+        with pytest.raises(ValueError, match="payload_too_large"):
+            _write_artifact(tmp_path, "safe-run", "oversized.json", {"x": "y"})
+    finally:
+        pipeline.write_json_artifact = original_write_json_artifact
+    assert not (tmp_path / "safe-run" / "oversized.json").exists()
+    from kg.governance.validation import validate_and_quarantine
+    report_path = tmp_path / "reports" / "validation.json"
+    validate_and_quarantine({"type": "Invoice", "source_record_id": "invoice-1"}, "run-043", report_path, tmp_path)
+    assert report_path.is_file()
+    with pytest.raises(RuntimeError, match="persistence"):
+        validate_and_quarantine({"type": "Invoice", "source_record_id": "invoice-1"}, "run-043", tmp_path.parent / "escape.json", tmp_path)
+    from kg.query.catalog import write_benchmark_artifact
+    benchmark_path = write_benchmark_artifact(tmp_path / "benchmark.json", artifact_root=tmp_path)
+    assert benchmark_path.is_file()
+    with pytest.raises(ValueError, match="escapes root"):
+        write_benchmark_artifact(tmp_path.parent / "escape.json", artifact_root=tmp_path)
+    from kg.graph.publication import SparqlGraphStoreHTTP
+    requests: list[object] = []
+    class Response:
+        status = 200
+        def __enter__(self) -> "Response": return self
+        def __exit__(self, *args: object) -> None: return None
+    def opener(request: object, timeout: int) -> Response:
+        requests.append(request)
+        return Response()
+    SparqlGraphStoreHTTP("https://graph.example", opener=opener).put_graph("https://example.org/graph/safe", (), request_id="req-043", run_id="run-043")
+    headers = dict(requests[0].header_items())  # type: ignore[attr-defined]
+    assert headers["X-request-id"] == "req-043" and headers["X-run-id"] == "run-043"
 
 
 def test_tc_044_api_error_and_request_correlation() -> None:

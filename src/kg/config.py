@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="KG_", env_file=".env", extra="ignore")
     service_name: str = "knowledge-graph-api"
     environment: str = "local"
-    data_as_of: date = date(2026, 1, 1)
+    data_as_of: date = date(2026, 1, 31)
     artifact_dir: Path = Path("artifacts")
     log_level: str = "INFO"
     api_key: str = Field(default="", repr=False)

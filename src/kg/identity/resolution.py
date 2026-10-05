@@ -11,14 +11,16 @@ import hashlib
 import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from typing import Any, Iterable, Mapping, Sequence
+from importlib import import_module
+from typing import Any, Callable, Iterable, Mapping, Sequence, cast
 
 from kg.observability.logging import get_logger, log_event
 from kg.observability.tracing import trace_call
 
+_rapid_ratio: Callable[[str, str], float] | None
 try:  # pragma: no cover - optional acceleration
-    from rapidfuzz.fuzz import ratio as _rapid_ratio
-except ImportError:  # pragma: no cover - exercised in the offline baseline
+    _rapid_ratio = cast(Callable[[str, str], float], getattr(import_module("rapidfuzz.fuzz"), "ratio"))
+except (ImportError, AttributeError):  # pragma: no cover - exercised in the offline baseline
     _rapid_ratio = None
 
 LOGGER = get_logger(__name__)
@@ -60,7 +62,7 @@ class ResolutionAssertion(dict[str, Any]):
     def __ge__(self, other: object) -> bool:
         if isinstance(other, set):
             return other <= set(self.keys())
-        return super().__ge__(other)  # type: ignore[arg-type]
+        return False
 
 
 @trace_call

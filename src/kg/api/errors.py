@@ -16,7 +16,7 @@ class ErrorMapping(dict[str, Any]):
         # type-10052026-Maurice: Compare envelope fields without reflecting invalid input values.
         if isinstance(other, set):
             return other <= set(self.keys())
-        return super().__ge__(other)  # type: ignore[misc]
+        return False
 
 
 @trace_call

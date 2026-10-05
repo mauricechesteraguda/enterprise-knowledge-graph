@@ -3,20 +3,27 @@
 from __future__ import annotations
 
 import hashlib
-import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Sequence
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from kg.observability.logging import get_logger, log_event
+from kg.observability.logging import get_logger, log_event, log_exception
 from kg.observability.tracing import trace_call
+from kg.ports import call_with_optional_context
 
 _LOGGER = get_logger(__name__)
 BASE = "https://example.org/kg/graph/"
 ONTOLOGY_GRAPH = BASE + "ontology"
 RESOLUTION_GRAPH = BASE + "resolution"
+
+
+@trace_call
+def _store_call(store: Any, operation: str, *args: Any, request_id: str | None = None, run_id: str | None = None) -> Any:
+    # type-10062026-Maurice: Pass each supported correlation keyword independently for every adapter shape.
+    return call_with_optional_context(getattr(store, operation), *args, request_id=request_id, run_id=run_id)
 
 
 @dataclass(frozen=True)
@@ -77,7 +84,7 @@ class InMemoryGraphStore:
         self.graphs: dict[str, tuple[tuple[str, str, str], ...]] = {}
 
     @trace_call
-    def query(self, intent: str, parameters: dict[str, str], limit: int, timeout_seconds: int) -> Sequence[dict[str, str]]:
+    def query(self, intent: str, parameters: dict[str, str], limit: int, timeout_seconds: int, *, request_id: str | None = None, run_id: str | None = None) -> Sequence[dict[str, str]]:
         return []
 
     @trace_call
@@ -107,46 +114,60 @@ class SparqlGraphStoreHTTP:
         self._opener = opener
 
     @trace_call
-    def _request(self, method: str, graph: str, body: bytes = b"") -> None:
+    def _request(self, method: str, graph: str, body: bytes = b"", *, request_id: str | None = None, run_id: str | None = None) -> None:
+        # type-10062026-Maurice: Carry bounded ETL correlation without logging graph/query contents.
         query = urlencode({"graph": graph})
-        request = Request(f"{self.endpoint}?{query}", data=body, method=method, headers={"Content-Type": "text/turtle"})
-        log_event(_LOGGER, "graphstore_http_call", source="graphstore", outcome="started")
+        headers = {"Content-Type": "text/turtle"}
+        if request_id and re.fullmatch(r"[A-Za-z0-9_.:-]{1,80}", request_id):
+            headers["X-Request-ID"] = request_id
+        if run_id and re.fullmatch(r"[A-Za-z0-9_.:-]{1,80}", run_id):
+            headers["X-Run-ID"] = run_id
+        request = Request(f"{self.endpoint}?{query}", data=body, method=method, headers=headers)
+        log_event(_LOGGER, "graphstore_http_call", source="graphstore", request_id=request_id, run_id=run_id, outcome="started")
         try:
             with self._opener(request, timeout=self.timeout_seconds) as response:
                 if getattr(response, "status", 200) >= 400:
                     raise RuntimeError("graphstore HTTP request failed")
-        except Exception:
-            log_event(_LOGGER, "graphstore_http_failed", source="graphstore", outcome="failed", error_code="http")
+        except Exception as exc:
+            log_exception(_LOGGER, "graphstore_http_failed", exc, operation="graphstore.http_request", request_id=request_id, run_id=run_id, error_code="http")
             raise
 
     @trace_call
-    def put_graph(self, graph_uri: str, triples: Sequence[tuple[str, str, str]]) -> None:
+    def put_graph(self, graph_uri: str, triples: Sequence[tuple[str, str, str]], *, request_id: str | None = None, run_id: str | None = None) -> None:
+        # type-10062026-Maurice: Keep store-port payloads out of logs while preserving correlation.
         body = "\n".join(f'<{s}> <{p}> "{o.replace(chr(34), chr(92)+chr(34))}" .' for s, p, o in triples).encode()
-        self._request("PUT", graph_uri, body)
+        self._request("PUT", graph_uri, body, request_id=request_id, run_id=run_id)
 
     @trace_call
-    def promote_graph(self, staging_uri: str, target_uri: str) -> None:
+    def promote_graph(self, staging_uri: str, target_uri: str, *, request_id: str | None = None, run_id: str | None = None) -> None:
+        # type-10062026-Maurice: Report promotion failures with bounded correlation only.
         update = f"DROP GRAPH <{target_uri}>; INSERT {{ GRAPH <{target_uri}> {{ ?s ?p ?o }} }} WHERE {{ GRAPH <{staging_uri}> {{ ?s ?p ?o }} }}; DROP GRAPH <{staging_uri}>"
-        request = Request(self.endpoint, data=update.encode(), method="POST", headers={"Content-Type": "application/sparql-update"})
+        headers = {"Content-Type": "application/sparql-update"}
+        if request_id and re.fullmatch(r"[A-Za-z0-9_.:-]{1,80}", request_id):
+            headers["X-Request-ID"] = request_id
+        if run_id and re.fullmatch(r"[A-Za-z0-9_.:-]{1,80}", run_id):
+            headers["X-Run-ID"] = run_id
+        request = Request(self.endpoint, data=update.encode(), method="POST", headers=headers)
         try:
             with self._opener(request, timeout=self.timeout_seconds) as response:
                 if getattr(response, "status", 200) >= 400:
                     raise RuntimeError("graphstore promotion failed")
-        except Exception:
-            log_event(_LOGGER, "graphstore_promotion_failed", source="graphstore", outcome="failed", error_code="promotion")
+        except Exception as exc:
+            log_exception(_LOGGER, "graphstore_promotion_failed", exc, operation="graphstore.promote", request_id=request_id, run_id=run_id, error_code="promotion")
             raise
 
     @trace_call
-    def discard_graph(self, graph_uri: str) -> None:
-        self._request("DELETE", graph_uri)
+    def discard_graph(self, graph_uri: str, *, request_id: str | None = None, run_id: str | None = None) -> None:
+        # type-10062026-Maurice: Clean staging through the same bounded correlation seam.
+        self._request("DELETE", graph_uri, request_id=request_id, run_id=run_id)
 
     @trace_call
-    def query(self, intent: str, parameters: dict[str, str], limit: int, timeout_seconds: int) -> Sequence[dict[str, str]]:
+    def query(self, intent: str, parameters: dict[str, str], limit: int, timeout_seconds: int, *, request_id: str | None = None, run_id: str | None = None) -> Sequence[dict[str, str]]:
         raise NotImplementedError("query catalog is outside the publication adapter")
 
 
 @trace_call
-def replace_atomically(store: Any, target_uri: str, triples: Sequence[tuple[str, str, str]] | None = None, run_id: str | None = None, artifact_dir: str | Path | None = None, fail_after: int | None = None) -> PublicationResult:
+def replace_atomically(store: Any, target_uri: str, triples: Sequence[tuple[str, str, str]] | None = None, run_id: str | None = None, artifact_dir: str | Path | None = None, fail_after: int | None = None, request_id: str | None = None) -> PublicationResult:
     """Stage, promote, and clean up; prior target remains authoritative on failure."""
     # type-10052026-Maurice: Retain the earlier contract's failure probe while supporting typed stores.
     if isinstance(store, str):
@@ -160,36 +181,36 @@ def replace_atomically(store: Any, target_uri: str, triples: Sequence[tuple[str,
         raise ValueError("triples and run_id are required")
     staging = _stage_uri(target_uri, run_id)
     try:
-        store.put_graph(staging, tuple(sorted(set(triples))))
-        store.promote_graph(staging, target_uri)
-        log_event(_LOGGER, "graph_published", source="graphstore", run_id=run_id, outcome="success")
+        _store_call(store, "put_graph", staging, tuple(sorted(set(triples))), request_id=request_id, run_id=run_id)
+        _store_call(store, "promote_graph", staging, target_uri, request_id=request_id, run_id=run_id)
+        log_event(_LOGGER, "graph_published", source="graphstore", request_id=request_id, run_id=run_id, outcome="success")
         return PublicationResult("succeeded", run_id=run_id, graph_uri=target_uri, fact_count=len(set(triples)), visible_version=run_id)
     except Exception as exc:
         try:
-            store.discard_graph(staging)
-        except Exception:
-            log_event(_LOGGER, "staging_cleanup_failed", source="graphstore", run_id=run_id, outcome="failed", error_code="cleanup")
-        log_event(_LOGGER, "graph_publication_failed", source="graphstore", run_id=run_id, outcome="failed", error_code=type(exc).__name__)
+            _store_call(store, "discard_graph", staging, request_id=request_id, run_id=run_id)
+        except Exception as cleanup_exc:
+            log_exception(_LOGGER, "staging_cleanup_failed", cleanup_exc, operation="publication.cleanup", request_id=request_id, run_id=run_id, error_code="cleanup")
+        log_exception(_LOGGER, "graph_publication_failed", exc, operation="publication.replace_atomically", request_id=request_id, run_id=run_id, error_code="publication_failed")
         return PublicationResult("failed", run_id=run_id, graph_uri=target_uri, error_artifact=type(exc).__name__, partial_visible=False)
 
 
 @trace_call
-def publish_source_graph(source: str, run_id: str, store: Any | None = None, records: Sequence[dict[str, Any]] | None = None, artifact_dir: str | Path | None = None) -> PublicationResult:
+def publish_source_graph(source: str, run_id: str, store: Any | None = None, records: Sequence[dict[str, Any]] | None = None, artifact_dir: str | Path | None = None, request_id: str | None = None) -> PublicationResult:
     """Publish one source graph after deterministic de-duplication."""
     target = graph_uri(source)
     store = store or InMemoryGraphStore()
     source_records = list(records or [{"source_system": source, "source_record_id": f"{source}-fixture", "run_id": run_id}])
     if any(record.get("valid") is False for record in source_records):
-        log_event(_LOGGER, "graph_publication_rejected", source=source, run_id=run_id, outcome="failed", error_code="invalid_data")
+        log_event(_LOGGER, "graph_publication_rejected", source=source, request_id=request_id, run_id=run_id, outcome="failed", error_code="invalid_data")
         return PublicationResult("failed", source, run_id, target, error_artifact="invalid_data")
     facts = _triples(source_records)
-    result = replace_atomically(store, target, facts, run_id, artifact_dir)
+    result = replace_atomically(store, target, facts, run_id, artifact_dir, request_id=request_id)
     return PublicationResult(result.status, source, run_id, target, result.fact_count, len(facts) - result.fact_count, result.visible_version, result.partial_visible, result.error_artifact, result.artifacts)
 
 
 @trace_call
-def publish_metadata_graphs(store: Any, run_id: str) -> tuple[PublicationResult, PublicationResult]:
+def publish_metadata_graphs(store: Any, run_id: str, request_id: str | None = None) -> tuple[PublicationResult, PublicationResult]:
     """Publish ontology and resolution metadata through the same atomic seam."""
-    ontology = replace_atomically(store, ONTOLOGY_GRAPH, [(ONTOLOGY_GRAPH, BASE + "runId", run_id)], run_id)
-    resolution = replace_atomically(store, RESOLUTION_GRAPH, [(RESOLUTION_GRAPH, BASE + "resolverVersion", "identity-v1")], run_id)
+    ontology = replace_atomically(store, ONTOLOGY_GRAPH, [(ONTOLOGY_GRAPH, BASE + "runId", run_id)], run_id, request_id=request_id)
+    resolution = replace_atomically(store, RESOLUTION_GRAPH, [(RESOLUTION_GRAPH, BASE + "resolverVersion", "identity-v1")], run_id, request_id=request_id)
     return ontology, resolution

@@ -9,6 +9,7 @@ import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+from collections.abc import Awaitable
 from typing import Any, Callable, ParamSpec, TypeVar, cast, get_type_hints
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -29,7 +30,8 @@ def trace_call(func: Callable[P, R]) -> Callable[P, R]:
             name = f"{func.__module__}.{func.__qualname__}"
             _write_trace({"ts": datetime.now(timezone.utc).isoformat(), "phase": "entry", "function": name})
             try:
-                result = await func(*args, **kwargs)  # type: ignore[misc]
+                async_func = cast(Callable[P, Awaitable[R]], func)
+                result = await async_func(*args, **kwargs)
             except Exception as exc:
                 _write_trace({"ts": datetime.now(timezone.utc).isoformat(), "phase": "exception", "function": name, "error_type": type(exc).__name__})
                 raise
@@ -39,7 +41,7 @@ def trace_call(func: Callable[P, R]) -> Callable[P, R]:
             annotations = get_type_hints(func)
             async_wrapped.__annotations__ = annotations
             signature = inspect.signature(func)
-            async_wrapped.__signature__ = signature.replace(parameters=[parameter.replace(annotation=annotations.get(parameter.name, parameter.annotation)) for parameter in signature.parameters.values()], return_annotation=annotations.get("return", signature.return_annotation))
+            setattr(async_wrapped, "__signature__", signature.replace(parameters=[parameter.replace(annotation=annotations.get(parameter.name, parameter.annotation)) for parameter in signature.parameters.values()], return_annotation=annotations.get("return", signature.return_annotation)))
         except (NameError, TypeError):
             pass
         return cast(Callable[P, R], async_wrapped)
@@ -58,7 +60,7 @@ def trace_call(func: Callable[P, R]) -> Callable[P, R]:
         annotations = get_type_hints(func)
         wrapped.__annotations__ = annotations
         signature = inspect.signature(func)
-        wrapped.__signature__ = signature.replace(parameters=[parameter.replace(annotation=annotations.get(parameter.name, parameter.annotation)) for parameter in signature.parameters.values()], return_annotation=annotations.get("return", signature.return_annotation))
+        setattr(wrapped, "__signature__", signature.replace(parameters=[parameter.replace(annotation=annotations.get(parameter.name, parameter.annotation)) for parameter in signature.parameters.values()], return_annotation=annotations.get("return", signature.return_annotation)))
     except (NameError, TypeError):
         pass
     return cast(Callable[P, R], wrapped)

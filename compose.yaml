@@ -62,7 +62,7 @@ services:
     environment:
       KG_ENVIRONMENT: ${KG_ENVIRONMENT:-local}
       KG_LOG_LEVEL: ${KG_LOG_LEVEL:-INFO}
-      KG_DATA_AS_OF: ${KG_DATA_AS_OF:-2026-01-01}
+      KG_DATA_AS_OF: ${KG_DATA_AS_OF:-2026-01-31}
       KG_ARTIFACT_DIR: /app/artifacts
       KG_CRM_DSN: postgresql://${CRM_POSTGRES_USER:-crm_reader}:${CRM_POSTGRES_PASSWORD:-crm_local_only}@crm-postgres:5432/${CRM_POSTGRES_DB:-crm}
       KG_CORS_ORIGINS: ${KG_CORS_ORIGINS:-["http://127.0.0.1:8000","http://localhost:8000"]}

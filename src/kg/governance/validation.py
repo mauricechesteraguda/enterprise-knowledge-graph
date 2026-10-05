@@ -2,14 +2,15 @@
 """SHACL validation gate with a deterministic fallback for minimal installations."""
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+from collections.abc import KeysView, Sequence
 from typing import Any
 
 from kg.observability.logging import get_logger, log_event
+from kg.artifacts.security import write_json_artifact
 from kg.observability.tracing import trace_call
 
 _LOGGER = get_logger(__name__)
@@ -30,7 +31,7 @@ class Report(set[str]):
 
     # type-10052026-Maurice: Expose machine-readable report keys without source payloads.
     @trace_call
-    def keys(self):
+    def keys(self) -> KeysView[str]:
         return self._values.keys()
 
     # type-10052026-Maurice: Permit stable field access for quarantine consumers.
@@ -44,13 +45,13 @@ class ValidationResult:
     """Outcome of the publication gate; rejected records are never publishable."""
 
     published: bool
-    report: dict[str, Any] = field(default_factory=dict)
-    quarantined: tuple[dict[str, Any], ...] = ()
+    report: Report | dict[str, Any] = field(default_factory=dict)
+    quarantined: tuple[Report, ...] = ()
 
 
 # type-10052026-Maurice: Normalize records without retaining unrestricted source content.
 @trace_call
-def _violations(record: dict[str, Any], run_id: str) -> list[dict[str, str]]:
+def _violations(record: dict[str, Any], run_id: str) -> list[Report]:
     kind = str(record.get("type", ""))
     source = str(record.get("source_record_id", "unknown"))
     errors: list[tuple[str, str]] = []
@@ -75,13 +76,20 @@ def _violations(record: dict[str, Any], run_id: str) -> list[dict[str, str]]:
 
 # type-10052026-Maurice: Persist only bounded report fields and fail closed on I/O errors.
 @trace_call
-def _persist(report: list[dict[str, Any]], report_path: str | Path | None) -> None:
+def _persist(report: Sequence[Report | dict[str, Any]], report_path: str | Path | None, artifact_root: str | Path | None = None) -> None:
     if report_path is None:
         return
     try:
         path = Path(report_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps([dict(item._values) if isinstance(item, Report) else item for item in report], sort_keys=True, indent=2), encoding="utf-8")
+        root = Path(artifact_root) if artifact_root is not None else path.parent
+        if artifact_root is not None:
+            try:
+                relative = path.resolve(strict=False).relative_to(root.resolve(strict=False))
+            except ValueError as exc:
+                raise ValueError("artifact path escapes root") from exc
+        else:
+            relative = Path(path.name)
+        write_json_artifact(root, relative.as_posix(), [dict(item._values) if isinstance(item, Report) else item for item in report])
         log_event(_LOGGER, "validation_report_persisted", outcome="success")
     except Exception:
         log_event(_LOGGER, "validation_report_persistence_failed", outcome="failed", error_code="artifact_io")
@@ -90,13 +98,13 @@ def _persist(report: list[dict[str, Any]], report_path: str | Path | None) -> No
 
 # type-10052026-Maurice: Gate publication and quarantine all violations atomically.
 @trace_call
-def validate_and_quarantine(record: dict[str, Any], run_id: str, report_path: str | Path | None = None) -> ValidationResult:
+def validate_and_quarantine(record: dict[str, Any], run_id: str, report_path: str | Path | None = None, artifact_root: str | Path | None = None) -> ValidationResult:
     """Validate one source record; no invalid record can be marked published."""
     try:
         if not isinstance(record, dict) or not run_id:
             raise ValueError("record and run_id are required")
         violations = _violations(record, run_id)
-        _persist(violations, report_path)
+        _persist(violations, report_path, artifact_root)
         result = ValidationResult(published=not violations, report=violations[0] if violations else {}, quarantined=tuple(violations))
         log_event(_LOGGER, "shacl_validation_completed", outcome="accepted" if result.published else "quarantined")
         return result
@@ -107,14 +115,14 @@ def validate_and_quarantine(record: dict[str, Any], run_id: str, report_path: st
 
 # type-10052026-Maurice: Exercise distinct malformed date, taxonomy, and email quarantine cases.
 @trace_call
-def validate_fixtures() -> list[dict[str, str]]:
+def validate_fixtures() -> list[Report]:
     """Return deterministic reports for the documented invalid fixture classes."""
     fixtures = [
         {"type": "Invoice", "source_record_id": "billing-invalid-date", "status": "Paid", "due_date": "31-01-2026", "source_system": "billing", "data_as_of": "2026-01-31"},
         {"type": "Invoice", "source_record_id": "billing-invalid-status", "status": "Settled", "due_date": "2026-01-31", "source_system": "billing", "data_as_of": "2026-01-31"},
         {"type": "SupportTicket", "source_record_id": "support-invalid-email", "email": "not-an-email", "priority": "High", "source_system": "support", "data_as_of": "2026-01-31"},
     ]
-    reports: list[dict[str, str]] = []
+    reports: list[Report] = []
     for fixture in fixtures:
         reports.extend(_violations(fixture, "fixture-validation"))
     return reports
@@ -122,7 +130,7 @@ def validate_fixtures() -> list[dict[str, str]]:
 
 # type-10052026-Maurice: Run the real pySHACL gate when RDF dependencies are installed.
 @trace_call
-def validate_graph(data_graph: Any, run_id: str, report_path: str | Path | None = None) -> ValidationResult:
+def validate_graph(data_graph: Any, run_id: str, report_path: str | Path | None = None, artifact_root: str | Path | None = None) -> ValidationResult:
     """Validate an RDFLib graph with committed shapes, failing closed if unavailable."""
     try:
         from rdflib import Graph, Namespace
@@ -142,7 +150,7 @@ def validate_graph(data_graph: Any, run_id: str, report_path: str | Path | None 
                 "run_id": run_id,
             }
             reports.append(Report(values))
-        _persist(reports, report_path)
+        _persist(reports, report_path, artifact_root)
         return ValidationResult(published=bool(conforms), report=reports[0] if reports else {}, quarantined=tuple(reports))
     except (ImportError, OSError, ValueError) as exc:
         log_event(_LOGGER, "shacl_runtime_unavailable", outcome="failed", error_code=type(exc).__name__)

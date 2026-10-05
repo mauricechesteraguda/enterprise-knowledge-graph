@@ -8,7 +8,7 @@ import importlib
 from collections.abc import Callable
 from typing import Any
 
-import pytest
+from typing import cast
 
 from kg.observability.tracing import trace_call
 
@@ -20,7 +20,7 @@ def _contract(module_name: str, symbol: str) -> Callable[..., Any]:
     candidate = getattr(module, symbol)
     if not callable(candidate):
         raise TypeError(f"public contract is not callable: {module_name}.{symbol}")
-    return candidate
+    return cast(Callable[..., Any], candidate)
 
 
 def test_tc_001_reproducibility() -> None:

@@ -16,7 +16,7 @@ class ApiAnswerResult(dict[str, Any]):
         # type-10052026-Maurice: Compare requested fields against response keys without payload logging.
         if isinstance(other, set):
             return other <= set(self.keys())
-        return super().__ge__(other)  # type: ignore[misc]
+        return False
 
 
 class ApiEvidenceItem(dict[str, Any]):
@@ -27,7 +27,7 @@ class ApiEvidenceItem(dict[str, Any]):
         # type-10052026-Maurice: Compare required evidence fields without exposing values.
         if isinstance(other, set):
             return other <= set(self.keys())
-        return super().__ge__(other)  # type: ignore[misc]
+        return False
 
 
 @trace_call
