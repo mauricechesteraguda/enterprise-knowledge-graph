@@ -7,6 +7,7 @@
 - Added bounded request/run correlation across API, ETL, graph publication, and query boundaries.
 - Hardened structured logging with allowlisted fields, bounded values, secret/PII redaction, and safe exception diagnostics.
 - Hardened artifact-path confinement and typed adapter compatibility without exposing source payloads.
+- Made TC-035 deterministic across UIDs by forcing the artifact persistence seam through an ordinary-file ancestor (`ENOTDIR`), preserving fail-closed status assertions.
 
 ## Verification
 

@@ -6,6 +6,7 @@ results.  The implementation is intentionally absent in this RED phase.
 """
 import importlib
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from typing import cast
@@ -284,10 +285,12 @@ def test_tc_034_mapping_failure_closed() -> None:
     assert result.status == "failed" and result.published_facts == 0 and result.error_artifact is not None
 
 
-def test_tc_035_artifact_failure_closed() -> None:
+def test_tc_035_artifact_failure_closed(tmp_path: Path) -> None:
     """TC-035: artifact persistence failure never claims success."""
     run = _contract("kg.etl.pipeline", "run_source")
-    result = run("crm", artifact_dir="/unavailable", run_id="run-artifact-fail")
+    artifact_parent = tmp_path / "artifact-parent"
+    artifact_parent.write_text("not a directory", encoding="utf-8")
+    result = run("crm", artifact_dir=artifact_parent / "nested", run_id="run-artifact-fail")
     assert result.status == "failed" and result.success_claimed is False
 
 
