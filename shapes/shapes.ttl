@@ -1,0 +1,14 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix kg: <https://example.org/kg/> .
+
+kg:InvoiceShape a sh:NodeShape ; sh:targetClass kg:Invoice ;
+  sh:property [ sh:path kg:status ; sh:minCount 1 ; sh:in (kg:Paid kg:Unpaid kg:Overdue) ; sh:message "Invoice status must be a known taxonomy value" ] ;
+  sh:property [ sh:path kg:dueDate ; sh:minCount 1 ; sh:datatype xsd:date ; sh:message "Invoice due date must be an ISO date" ] .
+kg:SourceRecordShape a sh:NodeShape ; sh:targetClass kg:SourceRecord ;
+  sh:property [ sh:path kg:sourceSystem ; sh:minCount 1 ; sh:message "Source system is required" ] ;
+  sh:property [ sh:path kg:runId ; sh:minCount 1 ; sh:message "Run ID is required" ] ;
+  sh:property [ sh:path kg:dataAsOf ; sh:minCount 1 ; sh:datatype xsd:date ; sh:message "DATA_AS_OF must be an ISO date" ] .
+kg:SupportTicketShape a sh:NodeShape ; sh:targetClass kg:SupportTicket ;
+  sh:property [ sh:path kg:ticketEmail ; sh:minCount 1 ; sh:pattern "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$" ; sh:message "Ticket email must be valid" ] ;
+  sh:property [ sh:path kg:priority ; sh:minCount 1 ; sh:in (kg:Low kg:Medium kg:High) ] .

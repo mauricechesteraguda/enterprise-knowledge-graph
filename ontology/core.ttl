@@ -1,0 +1,27 @@
+@prefix kg: <https://example.org/kg/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+
+kg: a owl:Ontology ; rdfs:label "Enterprise KG core ontology"@en .
+
+kg:Person a owl:Class ; rdfs:label "Canonical person"@en .
+kg:Organization a owl:Class ; rdfs:label "Organization"@en .
+kg:Account a owl:Class ; rdfs:label "Account"@en .
+kg:Invoice a owl:Class ; rdfs:label "Invoice"@en .
+kg:SupportTicket a owl:Class ; rdfs:label "Support ticket"@en .
+kg:Product a owl:Class ; rdfs:label "Product"@en .
+kg:Document a owl:Class ; rdfs:label "Document"@en .
+kg:SourceRecord a owl:Class ; rdfs:label "Source record"@en ; rdfs:subClassOf prov:Entity .
+
+kg:hasAccount a owl:ObjectProperty ; rdfs:domain kg:Person ; rdfs:range kg:Account .
+kg:hasInvoice a owl:ObjectProperty ; rdfs:domain kg:Account ; rdfs:range kg:Invoice .
+kg:raisedTicket a owl:ObjectProperty ; rdfs:domain kg:Person ; rdfs:range kg:SupportTicket .
+kg:concernsProduct a owl:ObjectProperty ; rdfs:domain kg:SupportTicket ; rdfs:range kg:Product .
+kg:sourceSystem a owl:DatatypeProperty ; rdfs:range rdfs:Literal .
+kg:sourceRecord a owl:ObjectProperty ; rdfs:range kg:SourceRecord .
+kg:provenance a owl:ObjectProperty ; rdfs:range prov:Entity .
+kg:runId a owl:DatatypeProperty ; rdfs:range rdfs:Literal .
+kg:dataAsOf a owl:DatatypeProperty ; rdfs:range rdfs:Literal .
+kg:status a owl:ObjectProperty ; rdfs:range kg:InvoiceStatus .
+kg:priority a owl:ObjectProperty ; rdfs:range kg:TicketPriority .

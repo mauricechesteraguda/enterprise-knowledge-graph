@@ -1,0 +1,26 @@
+[
+  {
+    "customer_email": "juan@example.test",
+    "data_as_of": "2026-01-31",
+    "priority": "high",
+    "source_id": "support-001",
+    "status": "open",
+    "text": "Invoice remains unpaid."
+  },
+  {
+    "customer_email": "orphan@example.test",
+    "data_as_of": "2026-01-31",
+    "priority": "low",
+    "source_id": "support-002",
+    "status": "open",
+    "text": "Unmatched request."
+  },
+  {
+    "customer_email": "bad-email",
+    "data_as_of": "2026-01-31",
+    "priority": "high",
+    "source_id": "support-2824",
+    "status": "open",
+    "text": "Malformed contact."
+  }
+]

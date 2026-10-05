@@ -1,0 +1,8 @@
+# type-10052026-Maurice: Find support tickets with no resolved canonical person.
+PREFIX kg: <https://example.org/kg/>
+SELECT ?ticket ?status ?priority WHERE {
+  ?ticket a kg:SupportTicket ; kg:status ?status ; kg:priority ?priority .
+  FILTER NOT EXISTS { ?person kg:raisedTicket ?ticket . }
+}
+ORDER BY ?ticket
+LIMIT 1000

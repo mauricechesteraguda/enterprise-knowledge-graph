@@ -1,0 +1,7 @@
+# type-10052026-Maurice: Return canonical identity records without exposing source payloads.
+PREFIX kg: <https://example.org/kg/>
+SELECT ?person ?name ?email ?sourceRecord WHERE {
+  ?person a kg:Person ; kg:name ?name ; kg:email ?email ; kg:sourceRecord ?sourceRecord .
+}
+ORDER BY ?person ?sourceRecord
+LIMIT 1000

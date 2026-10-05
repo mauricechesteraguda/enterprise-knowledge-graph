@@ -1,0 +1,8 @@
+@prefix kg: <https://example.org/kg/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+kg:BillingOntology a owl:Ontology .
+kg:amount a owl:DatatypeProperty ; rdfs:domain kg:Invoice .
+kg:currency a owl:DatatypeProperty ; rdfs:domain kg:Invoice .
+kg:dueDate a owl:DatatypeProperty ; rdfs:domain kg:Invoice .

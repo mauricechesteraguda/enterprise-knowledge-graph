@@ -1,0 +1,4 @@
+# type-10052026-Maurice: Map CRM source IDs and provenance through the executable seam.
+@prefix rr: <http://www.w3.org/ns/r2rml#> .
+@prefix rml: <http://semweb.mmlab.be/ns/rml#> .
+<#CRM> a rr:TriplesMap ; rml:logicalSource [ rml:source "crm.json" ] .

@@ -1,0 +1,7 @@
+@prefix kg: <https://example.org/kg/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+kg:SupportOntology a owl:Ontology .
+kg:ticketEmail a owl:DatatypeProperty ; rdfs:domain kg:SupportTicket .
+kg:ticketTextReference a owl:DatatypeProperty ; rdfs:domain kg:SupportTicket .

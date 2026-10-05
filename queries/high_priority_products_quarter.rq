@@ -1,0 +1,8 @@
+# type-10052026-Maurice: Restrict product/ticket evidence to a caller-supplied quarter.
+PREFIX kg: <https://example.org/kg/>
+SELECT ?product ?ticket ?openedAt WHERE {
+  ?ticket a kg:SupportTicket ; kg:priority kg:High ; kg:concernsProduct ?product ; kg:openedAt ?openedAt .
+  FILTER (?openedAt >= ?quarterStart && ?openedAt < ?quarterEnd)
+}
+ORDER BY ?openedAt ?product ?ticket
+LIMIT 1000

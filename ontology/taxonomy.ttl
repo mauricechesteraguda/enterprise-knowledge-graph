@@ -1,0 +1,11 @@
+@prefix kg: <https://example.org/kg/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+kg:InvoiceStatus a skos:ConceptScheme ; skos:prefLabel "Invoice status"@en .
+kg:Paid a skos:Concept ; skos:inScheme kg:InvoiceStatus ; skos:prefLabel "Paid"@en .
+kg:Unpaid a skos:Concept ; skos:inScheme kg:InvoiceStatus ; skos:prefLabel "Unpaid"@en .
+kg:Overdue a skos:Concept ; skos:inScheme kg:InvoiceStatus ; skos:prefLabel "Overdue"@en .
+kg:TicketPriority a skos:ConceptScheme ; skos:prefLabel "Ticket priority"@en .
+kg:Low a skos:Concept ; skos:inScheme kg:TicketPriority ; skos:prefLabel "Low"@en .
+kg:Medium a skos:Concept ; skos:inScheme kg:TicketPriority ; skos:prefLabel "Medium"@en .
+kg:High a skos:Concept ; skos:inScheme kg:TicketPriority ; skos:prefLabel "High"@en .

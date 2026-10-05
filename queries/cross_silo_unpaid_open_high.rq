@@ -1,0 +1,10 @@
+# type-10052026-Maurice: Keep the cross-silo intent as a bounded read-only query.
+PREFIX kg: <https://example.org/kg/>
+SELECT ?person ?invoice ?ticket WHERE {
+  ?person a kg:Person ; kg:hasAccount ?account ; kg:raisedTicket ?ticket .
+  ?account kg:hasInvoice ?invoice .
+  ?invoice kg:status kg:Unpaid .
+  ?ticket a kg:SupportTicket ; kg:status kg:Open ; kg:priority kg:High .
+}
+ORDER BY ?person ?invoice ?ticket
+LIMIT 1000

@@ -1,0 +1,11 @@
+# type-10052026-Maurice: Traverse the approved Person-to-ticket product path only.
+PREFIX kg: <https://example.org/kg/>
+SELECT ?person ?account ?invoice ?invoiceLine ?product ?ticket WHERE {
+  ?person a kg:Person ; kg:hasAccount ?account .
+  ?account kg:hasInvoice ?invoice .
+  ?invoice kg:hasInvoiceLine ?invoiceLine .
+  ?invoiceLine kg:lineProduct ?product .
+  ?ticket a kg:SupportTicket ; kg:concernsProduct ?product .
+}
+ORDER BY ?person ?account ?invoice ?invoiceLine ?product ?ticket
+LIMIT 1000

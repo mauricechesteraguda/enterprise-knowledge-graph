@@ -1,0 +1,30 @@
+[
+  {
+    "account_id": "acct-001",
+    "data_as_of": "2026-01-31",
+    "email": "juan@example.test",
+    "name": "Juan Dela Cruz",
+    "source_id": "crm-001"
+  },
+  {
+    "account_id": "acct-002",
+    "data_as_of": "2026-01-31",
+    "email": "jane@example.test",
+    "name": "Jane Smith",
+    "source_id": "crm-002"
+  },
+  {
+    "account_id": "acct-001",
+    "data_as_of": "2026-01-31",
+    "email": "juan@example.test",
+    "name": "Juan Dela Crz",
+    "source_id": "crm-dup-001"
+  },
+  {
+    "account_id": "acct-003",
+    "data_as_of": "not-a-date",
+    "email": "bad@example.test",
+    "name": "Bad Date",
+    "source_id": "crm-invalid-01"
+  }
+]

@@ -1,0 +1,9 @@
+# type-10052026-Maurice: Aggregate unpaid invoice counts by canonical organization.
+PREFIX kg: <https://example.org/kg/>
+SELECT ?organization (COUNT(?invoice) AS ?unpaidCount) WHERE {
+  ?account kg:belongsToOrganization ?organization ; kg:hasInvoice ?invoice .
+  ?invoice a kg:Invoice ; kg:status kg:Unpaid .
+}
+GROUP BY ?organization
+ORDER BY ?organization
+LIMIT 1000

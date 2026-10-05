@@ -1,0 +1,4 @@
+source_id,account_id,amount,currency,status,due_date,data_as_of
+billing-001,acct-001,125.50,USD,unpaid,2026-01-31,2026-01-31
+billing-002,acct-002,50.00,USD,paid,2026-01-31,2026-01-31
+billing-invalid-01,acct-404,not-money,USD,unknown,2026-01-31,2026-01-31
