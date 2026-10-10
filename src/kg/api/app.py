@@ -11,6 +11,7 @@ from typing import Any, Callable, cast
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
@@ -118,6 +119,9 @@ def create_app(*, settings: Settings | None = None, graph_store: Any | None = No
     application.state.graph_store = graph_store or RDFLibGraphStore()
     application.state.vector_store = vector_store
     application.state.llm = llm
+    static_dir = Path.cwd() / "static"
+    if static_dir.is_dir():
+        application.mount("/static", StaticFiles(directory=static_dir), name="static")
     application.add_middleware(CORSMiddleware, allow_origins=getattr(configured, "cors_origins", []), allow_credentials=False, allow_methods=["GET", "POST"], allow_headers=["Content-Type", "X-API-Key", "X-Request-ID"])
 
     @application.get("/", include_in_schema=False)

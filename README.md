@@ -20,6 +20,16 @@ flowchart LR
 See [architecture](docs/architecture.md), [ontology](docs/ontology.md), and
 [integration](docs/integration.md) for boundaries and extension points.
 
+## Operator surface
+
+The local dashboard keeps service readiness, graph inventory, and grounded questions
+in one read-only view. It supports dark and light themes and preserves the evidence
+boundary for every answer.
+
+![Graphroom operator surface in dark mode](docs/screenshots/graphroom-dashboard.png)
+
+![Graphroom operator surface in light mode](docs/screenshots/graphroom-dashboard-light.png)
+
 ## Quickstart
 
 The baseline needs only Python 3.11–3.13:

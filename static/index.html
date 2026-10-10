@@ -3,39 +3,54 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Knowledge Graph Operations</title>
+  <meta name="description" content="A local operator view for graph health, evidence, and governed knowledge queries.">
+  <title>Graphroom | Knowledge Graph Operations</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
   <main class="shell">
-    <header class="hero">
-      <p class="eyebrow">ENTERPRISE KNOWLEDGE GRAPH · OPERATIONS</p>
-      <h1>Grounded answers, visible evidence.</h1>
-      <p class="lede">A local, read-only view of graph health, ETL freshness, and answer provenance.</p>
+    <nav class="topbar" aria-label="Primary navigation">
+      <a class="brand" href="/" aria-label="Graphroom home"><span class="brand-mark" aria-hidden="true"></span><span>Graphroom</span></a>
+      <div class="topbar-meta"><span class="live-indicator" aria-hidden="true"></span><span>Local operator view</span><button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false">Use light mode</button></div>
+    </nav>
+    <header class="hero" id="main-content">
+      <div class="hero-copy">
+        <p class="eyebrow">Enterprise knowledge graph</p>
+        <h1>Grounded answers, visible evidence.</h1>
+        <p class="lede">A read-only control surface for graph health, data freshness, and evidence-backed questions.</p>
+      </div>
+      <div class="hero-note" aria-label="System principle"><span class="hero-note-label">Operating principle</span><strong>Trust the record.</strong><span>Every answer keeps its source boundary in view.</span></div>
     </header>
-    <section aria-labelledby="health-heading">
-      <div class="section-heading"><h2 id="health-heading">Service health</h2><span id="health-status" class="status pending">Loading</span></div>
-      <div id="health-cards" class="cards" aria-live="polite"></div>
+    <div class="overview-grid">
+      <section aria-labelledby="health-heading" class="surface health-section">
+        <div class="section-heading"><div><p class="section-kicker">01 / Readiness</p><h2 id="health-heading">Service health</h2></div><span id="health-status" class="status pending">Loading</span></div>
+        <div id="health-cards" class="cards" aria-live="polite" aria-busy="true"><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div></div>
+      </section>
+      <section aria-labelledby="stats-heading" class="surface snapshot-section">
+        <div class="section-heading"><div><p class="section-kicker">02 / Inventory</p><h2 id="stats-heading">Graph snapshot</h2></div><span id="stats-status" class="status pending">Loading</span></div>
+        <div id="stats-cards" class="cards" aria-live="polite" aria-busy="true"><div class="skeleton-card"></div><div class="skeleton-card"></div></div>
+      </section>
+    </div>
+    <section aria-labelledby="question-heading" class="ask-panel surface">
+      <div class="ask-intro"><p class="section-kicker">03 / Evidence desk</p><h2 id="question-heading">Ask the graph</h2><p>Use a catalogued question to keep retrieval bounded and the answer auditable.</p><div class="ask-rule" aria-hidden="true"></div><p class="ask-hint"><span class="keycap">Enter</span> submits your question</p></div>
+      <div class="ask-form">
+        <div class="section-heading"><span class="form-label">Query builder</span><span id="answer-status" class="status">Ready</span></div>
+        <label for="sample-question">Start with a sample</label>
+        <select id="sample-question">
+          <option value="">Choose a grounded question</option>
+          <option>Which organizations have unpaid invoices?</option>
+          <option>Which high priority products are open this quarter?</option>
+          <option>Show canonical identity records.</option>
+        </select>
+        <label for="question">Your question</label>
+        <textarea id="question" rows="4" maxlength="1000" placeholder="Ask a question supported by the graph"></textarea>
+        <div class="form-footer"><span class="character-note">Up to 1,000 characters</span><button id="ask" type="button">Get grounded answer <span aria-hidden="true">→</span></button></div>
+        <p id="ask-message" class="message" role="status"></p>
+        <article id="answer-card" class="answer-card" hidden></article>
+      </div>
     </section>
-    <section aria-labelledby="question-heading" class="ask-panel">
-      <div class="section-heading"><h2 id="question-heading">Ask the graph</h2><span id="answer-status" class="status">Ready</span></div>
-      <label for="sample-question">Sample question</label>
-      <select id="sample-question">
-        <option value="">Choose a grounded question…</option>
-        <option>Which organizations have unpaid invoices?</option>
-        <option>Which high priority products are open this quarter?</option>
-        <option>Show canonical identity records.</option>
-      </select>
-      <label for="question">Custom question</label>
-      <textarea id="question" rows="3" maxlength="1000" placeholder="Ask a question supported by the graph…"></textarea>
-      <button id="ask" type="button">Get grounded answer</button>
-      <p id="ask-message" class="message" role="status"></p>
-      <article id="answer-card" class="answer-card" hidden></article>
-    </section>
-    <section aria-labelledby="stats-heading">
-      <div class="section-heading"><h2 id="stats-heading">Graph snapshot</h2><span id="stats-status" class="status pending">Loading</span></div>
-      <div id="stats-cards" class="cards" aria-live="polite"></div>
-    </section>
+    <footer class="footer"><span>Graphroom operator surface</span><span>Read-only by design</span></footer>
   </main>
   <script src="/static/app.js" defer></script>
 </body>
